@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Expert - DeepSeek</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root{--primary:#2563eb;--secondary:#1d4ed8;--light:#f0f9ff;--dark:#1e293b}
+        *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI','Roboto',sans-serif}
+        .chatbot-widget{position:fixed;bottom:30px;right:30px;width:380px;height:500px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.15);overflow:hidden;display:flex;flex-direction:column;z-index:10000;background:#fff;transform:translateY(100px);opacity:0;transition:transform .4s cubic-bezier(.18,.89,.32,1.28),opacity .3s}
+        .chatbot-widget.active{transform:translateY(0);opacity:1}
+        .widget-header{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;padding:20px;display:flex;justify-content:space-between;align-items:center}
+        .branding{display:flex;align-items:center;gap:12px}
+        .branding h3{font-weight:700;font-size:1.3rem;margin:0}
+        .ai-badge{background:rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:.75rem;font-weight:600}
+        .header-actions{display:flex;gap:15px}
+        .header-btn{background:0;border:0;color:#fff;font-size:1.2rem;cursor:pointer;transition:opacity .3s}
+        .header-btn:hover{opacity:.8}
+        .conversation-container{flex:1;padding:20px;overflow-y:auto;background:var(--light);display:flex;flex-direction:column;gap:15px}
+        .message{max-width:85%;padding:15px;border-radius:18px;line-height:1.6;position:relative;animation:fadeIn .3s ease-out;box-shadow:0 2px 8px rgba(0,0,0,0.05);font-size:15px}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        .user-message{background:#fff;border:1px solid #e0e7ff;align-self:flex-end;border-bottom-right-radius:5px}
+        .bot-message{background:#fff;border:1px solid #e0e7ff;align-self:flex-start;border-bottom-left-radius:5px}
+        .message-content{margin-bottom:5px}
+        .timestamp{font-size:.7rem;color:#94a3b8;text-align:right;margin-top:5px}
+        .typing-indicator{display:inline-flex;align-items:center;padding:12px 18px;background:#fff;border:1px solid #e0e7ff;border-radius:18px;align-self:flex-start}
+        .typing-dot{width:8px;height:8px;margin:0 3px;background:var(--primary);border-radius:50%;animation:typing 1.4s infinite}
+        .typing-dot:nth-child(2){animation-delay:.2s}.typing-dot:nth-child(3){animation-delay:.4s}
+        @keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+        .input-container{padding:20px;background:#fff;border-top:1px solid #f1f5f9;display:flex;gap:12px}
+        .message-input{flex:1;padding:14px 20px;border:1px solid #cbd5e1;border-radius:30px;outline:0;font-size:1rem;transition:all .3s;background:#f8fafc}
+        .message-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,0.1)}
+        .send-button{width:50px;height:50px;border-radius:50%;background:var(--primary);color:#fff;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s}
+        .send-button:hover{background:var(--secondary);transform:scale(1.05)}
+        .widget-toggle{position:fixed;bottom:30px;right:30px;width:60px;height:60px;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 20px rgba(37,99,235,0.25);z-index:9999;transition:all .3s}
+        .widget-toggle:hover{transform:scale(1.1);background:var(--secondary)}
+        .toggle-icon{font-size:24px}
+        .powered-by{text-align:center;padding:10px;font-size:.75rem;color:#94a3b8;background:#f8fafc}
+        .suggestions{display:flex;flex-wrap:wrap;gap:10px;margin:15px 0}
+        .suggestion-chip{background:rgba(37,99,235,0.08);color:var(--primary);border-radius:20px;padding:8px 16px;font-size:.85rem;cursor:pointer;transition:all .2s;border:1px solid #dbeafe}
+        .suggestion-chip:hover{background:rgba(37,99,235,0.15)}
+        .welcome-message{text-align:center;padding:20px;color:#475569}
+        .welcome-title{color:var(--primary);margin-bottom:10px;font-weight:700;font-size:1.2rem}
+        .error-message{background:#ffebee!important;border:1px solid #ffcdd2!important;color:#c62828}
+        @media (max-width:480px){.chatbot-widget{width:95%;right:2.5%;bottom:10px;height:85vh}.widget-toggle{bottom:20px;right:20px}}
+    </style>
+</head>
+<body>
+    <div class="widget-toggle" id="widgetToggle"><i class="fas fa-comments toggle-icon"></i></div>
+    <div class="chatbot-widget" id="chatbotWidget">
+        <div class="widget-header">
+            <div class="branding">
+                <i class="fas fa-robot"></i>
+                <h3>Expert Assistant</h3>
+                <span class="ai-badge">DeepSeek-R1</span>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" id="minimizeBtn"><i class="fas fa-minus"></i></button>
+                <button class="header-btn" id="closeBtn"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="conversation-container" id="conversationContainer">
+            <div class="welcome-message">
+                <h3 class="welcome-title">👋 Bună! Sunt asistentul tău AI</h3>
+                <p>Te pot ajuta cu informații despre produse și servicii. Cu ce te pot ajuta astăzi?</p>
+                <div class="suggestions">
+                    <div class="suggestion-chip">Care sunt prețurile?</div>
+                    <div class="suggestion-chip">Cum pot comanda?</div>
+                    <div class="suggestion-chip">Care este politica de retur?</div>
+                </div>
+            </div>
+        </div>
+        <div class="input-container">
+            <input type="text" class="message-input" id="messageInput" placeholder="Scrie întrebarea ta..." autocomplete="off">
+            <button class="send-button" id="sendButton"><i class="fas fa-paper-plane"></i></button>
+        </div>
+        <div class="powered-by">
+            Powered by <strong>DeepSeek-R1</strong> via OpenRouter
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURARE (înlocuiește cu cheia ta OpenRouter)
+        const CONFIG = {
+            apiKey: "sk-or-v1-XXXXXXXXXXXX",
+            apiEndpoint: "https://openrouter.ai/api/v1/chat/completions",
+            model: "deepseek-ai/deepseek-coder:33b-instruct"
+        };
+
+        // Inițializare elemente
+        const widgetToggle = document.getElementById('widgetToggle');
+        const chatbotWidget = document.getElementById('chatbotWidget');
+        const conversationContainer = document.getElementById('conversationContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        
+        // Stare aplicație
+        let isWidgetOpen = false;
+        let isProcessing = false;
+
+        // Funcție pentru adăugare mesaj
+        function addMessage(text, sender, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            if (isError) messageDiv.classList.add('error-message');
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">${text}</div>
+                <div class="timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+            `;
+            
+            conversationContainer.appendChild(messageDiv);
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
+
+        // Funcție pentru afișare eroare
+        function showError(message) {
+            addMessage(`⚠️ ${message}`, 'bot', true);
+        }
+
+        // Funcție pentru afișare indicator de tastare
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.classList.add('typing-indicator');
+            typingDiv.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            
+            conversationContainer.appendChild(typingDiv);
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
+
+        // Funcție pentru ascundere indicator de tastare
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        // Funcție pentru procesare mesaj
+        async function processMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isProcessing) return;
+            
+            // Adaugă mesajul utilizatorului
+            addMessage(message, 'user');
+            messageInput.value = '';
+            isProcessing = true;
+            
+            // Afișează indicatorul de tastare
+            showTypingIndicator();
+            
+            try {
+                // Trimite cererea la API
+                const response = await fetch(CONFIG.apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${CONFIG.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: CONFIG.model,
+                        messages: [{ role: "user", content: message }],
+                        max_tokens: 500
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.choices && data.choices[0].message) {
+                    addMessage(data.choices[0].message.content, 'bot');
+                } else {
+                    showError("Nu am putut obține un răspuns. Te rog încearcă din nou.");
+                }
+            } catch (error) {
+                console.error("Eroare API:", error);
+                showError("Eroare de conexiune. Te rog verifică internetul și încearcă din nou.");
+            } finally {
+                hideTypingIndicator();
+                isProcessing = false;
+            }
+        }
+
+        // Inițializare evenimente
+        function initEvents() {
+            // Comutare widget
+            widgetToggle.addEventListener('click', () => {
+                isWidgetOpen = !isWidgetOpen;
+                chatbotWidget.classList.toggle('active', isWidgetOpen);
+                if (isWidgetOpen) messageInput.focus();
+            });
+            
+            // Butoane widget
+            minimizeBtn.addEventListener('click', () => chatbotWidget.classList.remove('active'));
+            closeBtn.addEventListener('click', () => chatbotWidget.classList.remove('active'));
+            
+            // Trimitere mesaj
+            sendButton.addEventListener('click', processMessage);
+            messageInput.addEventListener('keypress', e => e.key === 'Enter' && processMessage());
+            
+            // Sugestii rapide
+            document.querySelectorAll('.suggestion-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    messageInput.value = chip.textContent;
+                    processMessage();
+                });
+            });
+        }
+
+        // Inițializare aplicație
+        function init() {
+            initEvents();
+            addMessage("Bună! Sunt asistentul tău virtual. Cu ce te pot ajuta astăzi?", 'bot');
+        }
+
+        // Pornire la încărcarea paginii
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
